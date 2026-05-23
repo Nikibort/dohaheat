@@ -525,7 +525,7 @@ function buildDistricts(){{
 function styleD(f){{
   const v=distVal(f.properties,curSeason,curLayer);
   const col=v!=null?curHex(v):'rgba(255,255,255,0.15)';
-  return{{color:col,weight:1.6,fillColor:col,fillOpacity:0.22}};
+  return{{color:col,weight:2.0,fillColor:col,fillOpacity:0.02}};
 }}
 function refreshStyles(){{if(distLayer)distLayer.setStyle(f=>styleD(f));}}
 
@@ -534,7 +534,7 @@ function refreshStyles(){{if(distLayer)distLayer.setStyle(f=>styleD(f));}}
 // ════════════════════════════════════════════════════
 const htip=document.getElementById('htip');
 function onOver(e,f,l){{
-  l.setStyle({{fillOpacity:0.50,weight:2.4}});l.bringToFront();
+  l.setStyle({{fillOpacity:0.08,weight:2.8}});l.bringToFront();
   const p=f.properties;
   const v=distVal(p,curSeason,curLayer);
   document.getElementById('ht-name').textContent=p.name_en||p.name;
