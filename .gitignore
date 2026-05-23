@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Earth Engine credentials (never commit)
+.config/earthengine/
+
+# Environment variables
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Large output data (keep HTML, not rasters)
+outputs/images/
+data/raw/
+*.tif
+*.tiff
+*.nc
+
+# Keep these tracked
+!outputs/maps/
+!docs/
+!docs/.nojekyll

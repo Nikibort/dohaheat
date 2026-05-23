@@ -1,0 +1,7 @@
+earthengine-api
+geemap
+geopandas
+pandas
+numpy
+matplotlib
+folium

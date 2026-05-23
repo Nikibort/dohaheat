@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Doha Urban Climate Atlas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --bg:#0a0c14;
+  --panel:rgba(10,12,20,0.94);
+  --border:rgba(255,255,255,0.09);
+  --text:#cdd0e0;
+  --muted:rgba(205,208,224,0.42);
+  --accent:#e8623a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:13px}
+#map{position:absolute;inset:0}
+
+/* ── Top bar ───────────────────────────────────────── */
+#topbar{
+  position:absolute;top:0;left:0;right:0;z-index:900;
+  height:48px;display:flex;align-items:center;gap:10px;padding:0 14px;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+}
+.brand-title{font-size:13px;font-weight:700;letter-spacing:.2px;flex-shrink:0}
+.brand-sub{font-size:10px;color:var(--muted);flex-shrink:0}
+.vr{width:1px;height:26px;background:var(--border);flex-shrink:0}
+
+/* Season pills */
+#season-pills{display:flex;gap:4px}
+.s-pill{
+  cursor:pointer;border:1.5px solid var(--border);border-radius:16px;
+  padding:4px 13px;font-size:12px;font-weight:600;letter-spacing:.2px;
+  background:rgba(255,255,255,0.03);color:var(--muted);
+  transition:all .15s;user-select:none;white-space:nowrap
+}
+.s-pill:hover{color:var(--text);background:rgba(255,255,255,0.08)}
+.s-pill.active{color:#fff}
+.s-pill[data-s=summer].active{background:#c0522a;border-color:#c0522a}
+.s-pill[data-s=autumn].active{background:#b08020;border-color:#b08020}
+.s-pill[data-s=winter].active{background:#4a90b8;border-color:#4a90b8}
+.s-pill[data-s=spring].active{background:#3a8c5a;border-color:#3a8c5a;color:#fff}
+
+/* Layer + basemap (right side) */
+#right-ctrls{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0}
+.lyr-btn{
+  cursor:pointer;border:1.5px solid var(--border);border-radius:7px;
+  padding:5px 12px;font-size:11px;font-weight:600;
+  background:rgba(255,255,255,0.03);color:var(--muted);
+  transition:all .15s;user-select:none
+}
+.lyr-btn:hover{color:var(--text);background:rgba(255,255,255,0.08)}
+.lyr-btn.active-t{background:rgba(200,80,40,.20);border-color:#c05028;color:#e07050}
+.lyr-btn.active-g{background:rgba(40,130,80,.20);border-color:#2e8b57;color:#5cb87a}
+.bm-group{display:flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden}
+.bm-btn{
+  cursor:pointer;padding:5px 10px;font-size:11px;font-weight:600;
+  background:rgba(255,255,255,0.03);color:var(--muted);
+  border-right:1px solid var(--border);transition:all .15s;user-select:none
+}
+.bm-btn:last-child{border-right:none}
+.bm-btn:hover{background:rgba(255,255,255,0.08);color:var(--text)}
+.bm-btn.active{background:rgba(255,255,255,0.16);color:#fff}
+
+/* ── Legend ────────────────────────────────────────── */
+#legend{
+  position:absolute;bottom:28px;left:14px;z-index:800;
+  background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;backdrop-filter:blur(12px);min-width:110px
+}
+#leg-title{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px}
+.cb-wrap{display:flex;gap:7px;align-items:stretch;height:164px}
+.cb-bar{width:15px;border-radius:3px;flex-shrink:0}
+#cb-t{background:linear-gradient(to top, #313695 0%, #4575b4 20%, #74add1 40%, #fee090 60%, #f46d43 80%, #a50026 100%)}
+#cb-g{background:linear-gradient(to top, #5c3a1e 0%, #9b7435 20%, #c8b850 40%, #7dc86e 60%, #2e8b57 80%, #1a5232 100%);display:none}
+.cb-ticks{display:flex;flex-direction:column;justify-content:space-between;
+  font-size:10px;color:var(--muted)}
+#leg-note{margin-top:8px;font-size:9px;color:var(--muted);line-height:1.5;max-width:110px}
+
+/* ── Info panel ─────────────────────────────────────── */
+#infopanel{
+  position:absolute;top:56px;right:14px;z-index:800;
+  background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:14px 15px;width:220px;backdrop-filter:blur(12px)
+}
+#ip-season{font-size:19px;font-weight:800;line-height:1;margin-bottom:2px}
+#ip-months{font-size:10px;color:var(--muted);margin-bottom:10px}
+.ip-stat{display:flex;justify-content:space-between;font-size:11px;
+  padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ip-stat:last-of-type{border:none}
+.ip-val{font-weight:700}
+#ip-note{margin-top:10px;font-size:10px;color:var(--muted);line-height:1.55}
+
+/* ── Hover tooltip ──────────────────────────────────── */
+#htip{
+  position:fixed;z-index:2000;pointer-events:none;
+  background:rgba(8,10,20,.97);border:1px solid var(--border);
+  border-radius:9px;padding:11px 14px;line-height:1.6;
+  display:none;max-width:240px;
+  box-shadow:0 4px 28px rgba(0,0,0,.65)
+}
+.ht-name{font-size:13px;font-weight:700;margin-bottom:0}
+.ht-ar{font-size:10px;color:var(--muted);margin-bottom:8px}
+.ht-val{font-size:22px;font-weight:800;margin-bottom:1px;line-height:1}
+.ht-label{font-size:10px;color:var(--muted);margin-bottom:8px}
+.ht-desc{font-size:11px;color:rgba(205,208,224,.72);line-height:1.58}
+
+/* ── Click popup ────────────────────────────────────── */
+.pop{font-family:'Inter','Segoe UI',system-ui,sans-serif;padding:3px;min-width:200px}
+.pop-name{font-size:14px;font-weight:800;margin-bottom:1px}
+.pop-ar{font-size:10px;opacity:.45;margin-bottom:10px}
+.pop-section{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  opacity:.4;margin-bottom:5px}
+.pop-bar{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px}
+.pop-bar-label{width:56px;opacity:.65;flex-shrink:0}
+.pop-bar-track{flex:1;height:10px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.pop-bar-fill{height:100%;border-radius:2px}
+.pop-bar-num{width:38px;text-align:right;font-weight:700}
+.pop-desc{margin-top:10px;font-size:10px;opacity:.5;line-height:1.55}
+.pop-src{margin-top:8px;font-size:9px;opacity:.3;line-height:1.4}
+
+/* ── Loader ─────────────────────────────────────────── */
+#loader{
+  position:absolute;inset:0;z-index:3000;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px
+}
+.ld-ring{
+  width:40px;height:40px;border:3px solid rgba(255,255,255,.07);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite
+}
+.ld-txt{font-size:11px;color:var(--muted)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Leaflet overrides ──────────────────────────────── */
+.leaflet-popup-content-wrapper{
+  background:rgba(10,12,22,.97)!important;color:#cdd0e0!important;
+  border-radius:10px!important;border:1px solid rgba(255,255,255,.09)!important;
+  box-shadow:0 6px 32px rgba(0,0,0,.7)!important
+}
+.leaflet-popup-tip{background:rgba(10,12,22,.97)!important}
+.leaflet-popup-close-button{color:rgba(205,208,224,.45)!important}
+.leaflet-control-attribution{font-size:9px!important;background:rgba(0,0,0,.55)!important;
+  color:rgba(255,255,255,.3)!important}
+.leaflet-control-zoom a{
+  background:rgba(10,12,22,.94)!important;color:#cdd0e0!important;
+  border-color:rgba(255,255,255,.09)!important
+}
+</style>
+</head>
+<body>
+<div id="loader"><div class="ld-ring"></div><div class="ld-txt">Rendering satellite layers…</div></div>
+<div id="map"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <span class="brand-title">Doha Urban Climate Atlas</span>
+  <span class="brand-sub">Landsat 8/9 · simulated demo median land-surface composite</span>
+  <div class="vr"></div>
+  <div id="season-pills"></div>
+  <div id="right-ctrls">
+    <div class="lyr-btn active-t" id="btn-t" onclick="setLayer('t')">Surface Heat</div>
+    <div class="lyr-btn"          id="btn-g" onclick="setLayer('g')">Greenery</div>
+    <div class="bm-group">
+      <div class="bm-btn active" id="bm-dark"      onclick="setBasemap('dark')">Dark</div>
+      <div class="bm-btn"        id="bm-satellite" onclick="setBasemap('satellite')">Satellite</div>
+      <div class="bm-btn"        id="bm-light"     onclick="setBasemap('light')">Light</div>
+    </div>
+  </div>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div id="leg-title">Temp (°C)</div>
+  <div class="cb-wrap">
+    <div class="cb-bar" id="cb-t"></div>
+    <div class="cb-bar" id="cb-g"></div>
+    <div class="cb-ticks" id="tick-t"></div>
+    <div class="cb-ticks" id="tick-g" style="display:none"></div>
+  </div>
+  <div id="leg-note">Median seasonal<br>composite from<br>all cloud-free scenes</div>
+</div>
+
+<!-- INFO PANEL -->
+<div id="infopanel">
+  <div id="ip-season"></div>
+  <div id="ip-months"></div>
+  <div class="ip-stat"><span>Hottest district</span><span class="ip-val" id="ip-hot"></span></div>
+  <div class="ip-stat"><span>Coolest district</span><span class="ip-val" id="ip-cool"></span></div>
+  <div class="ip-stat"><span>Surface avg</span><span class="ip-val" id="ip-avg"></span></div>
+  <div id="ip-note">Hover over a district to read its climate characteristics.</div>
+</div>
+
+<!-- HOVER TOOLTIP -->
+<div id="htip">
+  <div class="ht-name" id="ht-name"></div>
+  <div class="ht-ar"   id="ht-ar"></div>
+  <div class="ht-val"  id="ht-val"></div>
+  <div class="ht-label"id="ht-label"></div>
+  <div class="ht-desc" id="ht-desc"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════════════════
+const SEASONS     = {"summer": {"label": "Summer", "months": "Jun \u2013 Sep"}, "autumn": {"label": "Autumn", "months": "Oct \u2013 Nov"}, "winter": {"label": "Winter", "months": "Dec \u2013 Feb"}, "spring": {"label": "Spring", "months": "Mar \u2013 May"}};
+const SKEYS       = Object.keys(SEASONS);
+const TILE_URLS   = {};
+const USE_GEE     = false;
+const ZONAL       = {};
+const T_PAL       = [{"t": 20.0, "rgb": [49, 54, 149]}, {"t": 26.0, "rgb": [69, 117, 180]}, {"t": 32.0, "rgb": [116, 173, 209]}, {"t": 38.0, "rgb": [254, 224, 144]}, {"t": 44.0, "rgb": [244, 109, 67]}, {"t": 50.0, "rgb": [165, 0, 38]}];
+const G_PAL       = [{"t": -0.05, "rgb": [92, 58, 30]}, {"t": 0.05, "rgb": [155, 116, 53]}, {"t": 0.15000000000000002, "rgb": [200, 184, 80]}, {"t": 0.25, "rgb": [125, 200, 110]}, {"t": 0.35000000000000003, "rgb": [46, 139, 87]}, {"t": 0.45, "rgb": [26, 82, 50]}];
+const T_MIN=20.0, T_MAX=50.0;
+const G_MIN=-0.05, G_MAX=0.45;
+const BBOX={w:51.35,e:51.75,s:24.95,n:25.45};
+const CP_RAW      = [[25.32, 51.53, 46, 38, 24, 36, 0.04, 0.05, 0.06, 0.06], [25.37, 51.55, 40, 33, 20, 31, 0.08, 0.1, 0.12, 0.1], [25.28, 51.526, 43, 35, 22, 33, 0.07, 0.08, 0.1, 0.09], [25.26, 51.59, 52, 42, 28, 40, 0.02, 0.02, 0.03, 0.03], [25.31, 51.46, 41, 34, 21, 32, 0.2, 0.22, 0.25, 0.23], [25.27, 51.47, 43, 35, 22, 33, 0.12, 0.14, 0.16, 0.15], [25.26, 51.44, 42, 34, 21, 32, 0.22, 0.24, 0.28, 0.26], [25.43, 51.49, 47, 39, 25, 37, 0.07, 0.08, 0.1, 0.09], [25.17, 51.59, 43, 35, 21, 33, 0.08, 0.1, 0.12, 0.1], [25.27, 51.62, 49, 40, 26, 38, 0.03, 0.03, 0.04, 0.04], [25.22, 51.51, 46, 37, 23, 35, 0.04, 0.05, 0.07, 0.06], [25.22, 51.42, 48, 39, 25, 37, 0.02, 0.03, 0.05, 0.04], [25.46, 51.57, 43, 35, 21, 33, 0.04, 0.05, 0.07, 0.06], [25.2, 51.65, 50, 41, 27, 39, 0.03, 0.03, 0.04, 0.04], [25.38, 51.4, 44, 36, 22, 34, 0.1, 0.12, 0.14, 0.13]];
+const DISTRICTS   = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.515, 25.264], [51.51, 25.272], [51.508, 25.281], [51.51, 25.291], [51.514, 25.299], [51.524, 25.299], [51.531, 25.293], [51.539, 25.291], [51.545, 25.285], [51.545, 25.27], [51.538, 25.265], [51.528, 25.265], [51.524, 25.264], [51.515, 25.264]]]}, "properties": {"name": "Central Doha", "name_en": "Central Doha", "name_ar": "وسط الدوحة", "admin_level": "8", "description": "The historic downtown combining the Corniche waterfront promenade and the Msheireb regeneration district. The bay-facing edge benefits from sea breezes and irrigated greenery; the denser inland blocks retain more heat due to compact street layouts and limited canopy."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.502515340139595, 25.372696660073743], [51.52061378195581, 25.381588561898717], [51.521364408574925, 25.364331646538705], [51.50877056196548, 25.358453182521007], [51.502515340139595, 25.372696660073743]]]}, "properties": {"name": "West Bay Lagoon", "name_en": "West Bay Lagoon", "name_ar": "بحيرة الخليج الغربي", "admin_level": "8", "description": "A residential and mixed-use district centred on a circular artificial lagoon west of the CBD. Open water and some landscaping moderate surface temperatures noticeably below the fully paved districts immediately to the east."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.51, 25.3], [51.51, 25.33], [51.52, 25.341], [51.532, 25.341], [51.544, 25.336], [51.55, 25.325], [51.548, 25.313], [51.54, 25.303], [51.526, 25.299], [51.51, 25.3]]]}, "properties": {"name": "West Bay", "name_en": "West Bay", "name_ar": "الخليج الغربي", "admin_level": "8", "description": "Qatar's central business district, dominated by glass-and-steel towers, wide asphalt roads, and minimal natural ground cover. The high density of impervious surfaces makes this one of the city's most persistent heat zones."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.53, 25.353], [51.527, 25.362], [51.527, 25.373], [51.532, 25.382], [51.542, 25.39], [51.556, 25.394], [51.566, 25.391], [51.572, 25.382], [51.572, 25.37], [51.566, 25.36], [51.557, 25.353], [51.544, 25.35], [51.533, 25.351], [51.53, 25.353]]]}, "properties": {"name": "The Pearl-Qatar", "name_en": "The Pearl-Qatar", "name_ar": "لؤلؤة قطر", "admin_level": "8", "description": "A luxury artificial island with Gulf exposure on all sides. Coastal breezes and curated landscaping keep surface temperatures among the lowest of Doha's dense urban districts."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.558, 25.234], [51.555, 25.258], [51.557, 25.274], [51.57, 25.28], [51.592, 25.28], [51.618, 25.277], [51.642, 25.272], [51.656, 25.26], [51.651, 25.24], [51.632, 25.231], [51.6, 25.228], [51.572, 25.229], [51.558, 25.234]]]}, "properties": {"name": "Industrial Area", "name_en": "Industrial Area", "name_ar": "المنطقة الصناعية", "admin_level": "8", "description": "Qatar's primary logistics and manufacturing belt, covered almost entirely by warehouse rooftops and hardstanding. The city's lowest greenery index and highest recorded surface temperatures — driven by dark surfaces and zero shade."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.492, 25.208], [51.489, 25.226], [51.495, 25.241], [51.512, 25.249], [51.531, 25.249], [51.546, 25.241], [51.551, 25.226], [51.545, 25.21], [51.528, 25.203], [51.507, 25.203], [51.492, 25.208]]]}, "properties": {"name": "Al Thumama", "name_en": "Al Thumama", "name_ar": "الثمامة", "admin_level": "8", "description": "A transitional district between central Doha and Hamad International Airport, mixing residential blocks with logistics infrastructure. Greenery is limited to isolated gardens, keeping temperatures above the city median."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.428, 25.245], [51.426, 25.258], [51.431, 25.268], [51.442, 25.271], [51.442, 25.252], [51.436, 25.243], [51.428, 25.245]]]}, "properties": {"name": "Aspire Zone", "name_en": "Aspire Zone", "name_ar": "منطقة أسباير", "admin_level": "8", "description": "A 250-hectare sports and recreational park anchored by Khalifa International Stadium. Maintained athletic fields and tree cover create a local cool island — one of the greenest zones within the inner urban boundary."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.443, 25.253], [51.441, 25.267], [51.446, 25.278], [51.459, 25.285], [51.475, 25.284], [51.482, 25.275], [51.48, 25.261], [51.472, 25.251], [51.457, 25.248], [51.443, 25.253]]]}, "properties": {"name": "Al Waab", "name_en": "Al Waab", "name_ar": "الوعب", "admin_level": "8", "description": "An established suburban residential area between Education City and central Doha. Irrigated villa gardens and some street trees sustain moderate greenery, though daytime surface temperatures remain elevated compared to park zones."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.418, 25.296], [51.416, 25.311], [51.421, 25.323], [51.432, 25.331], [51.447, 25.333], [51.461, 25.329], [51.469, 25.316], [51.469, 25.299], [51.461, 25.29], [51.444, 25.287], [51.428, 25.288], [51.418, 25.296]]]}, "properties": {"name": "Education City", "name_en": "Education City", "name_ar": "المدينة التعليمية", "admin_level": "8", "description": "Qatar Foundation's 2,500-hectare academic campus with irrigated lawns, tree-lined boulevards, and low building density. The most consistently vegetated large district in western Doha, reliably cooler than surrounding areas."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.447, 25.393], [51.443, 25.416], [51.446, 25.438], [51.456, 25.452], [51.472, 25.461], [51.492, 25.464], [51.51, 25.461], [51.526, 25.452], [51.532, 25.437], [51.53, 25.416], [51.52, 25.403], [51.503, 25.392], [51.481, 25.388], [51.461, 25.39], [51.447, 25.393]]]}, "properties": {"name": "Lusail City", "name_en": "Lusail City", "name_ar": "مدينة لوسيل", "admin_level": "7", "description": "A fast-growing planned city to Doha's north. Young street trees and an abundance of new concrete and asphalt push surface temperatures toward the higher end of the suburban range despite its modern design."}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[51.565, 25.146], [51.562, 25.163], [51.566, 25.176], [51.579, 25.185], [51.595, 25.188], [51.613, 25.186], [51.626, 25.177], [51.628, 25.163], [51.621, 25.15], [51.606, 25.143], [51.585, 25.141], [51.57, 25.143], [51.565, 25.146]]]}, "properties": {"name": "Al Wakrah", "name_en": "Al Wakrah", "name_ar": "الوكرة", "admin_level": "6", "description": "A historic fishing town turned residential suburb on Doha's southern coast. Lower building density and coastal proximity moderate surface temperatures, and established neighbourhoods carry more mature greenery than newer northern developments."}}]};
+const S_IDX={summer:0,autumn:1,winter:2,spring:3};
+
+const SEASON_STATS={
+  summer:{hot:"Industrial Area",cool:"The Pearl-Qatar",avg:"44°C",
+    note:"Peak summer: industrial surfaces reach 52°C; coastal districts stay near 40°C."},
+  autumn:{hot:"Industrial Area",cool:"The Pearl-Qatar",avg:"36°C",
+    note:"Autumn brings 8–10°C of relief. Coastal and green districts cool fastest."},
+  winter:{hot:"Industrial Area",cool:"The Pearl-Qatar",avg:"23°C",
+    note:"Mild city-wide. Even in winter, industrial surfaces sit above 27°C."},
+  spring:{hot:"Industrial Area",cool:"The Pearl-Qatar",avg:"34°C",
+    note:"Rapid urban warming begins. Dense paved zones heat up ahead of greener areas."},
+};
+
+// ════════════════════════════════════════════════════
+// COLOUR UTILS
+// ════════════════════════════════════════════════════
+function lerp(a,b,t){return a+t*(b-a)}
+function palRGB(v,pal,vmin,vmax){
+  const f=Math.max(0,Math.min(1,(v-vmin)/(vmax-vmin)));
+  const p=f*(pal.length-1), lo=Math.floor(p), hi=Math.min(pal.length-1,lo+1), a=p-lo;
+  const A=pal[lo].rgb, B=pal[hi].rgb;
+  return [lerp(A[0],B[0],a),lerp(A[1],B[1],a),lerp(A[2],B[2],a)].map(Math.round);
+}
+function hex(r,g,b){return'#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('')}
+function tHex(v){const[r,g,b]=palRGB(v,T_PAL,T_MIN,T_MAX);return hex(r,g,b)}
+function gHex(v){const[r,g,b]=palRGB(v,G_PAL,G_MIN,G_MAX);return hex(r,g,b)}
+function curHex(v){return curLayer==='g'?gHex(v):tHex(v)}
+
+// ════════════════════════════════════════════════════
+// IDW CANVAS SIMULATION
+// ════════════════════════════════════════════════════
+function idw(lat,lon,pts,pw){
+  let ws=0,wt=0;
+  for(const p of pts){
+    const dx=(lon-p[1])*Math.cos(lat*Math.PI/180),dy=lat-p[0];
+    const d2=dx*dx+dy*dy;
+    if(d2<1e-9)return p[2];
+    const w=1/Math.pow(d2,pw/2);
+    ws+=w*p[2];wt+=w;
+  }
+  return ws/wt;
+}
+const RES=320;
+const cvCache={};
+function makeCanvas(season,layer){
+  const key=season+layer;
+  if(cvCache[key])return cvCache[key];
+  const si=S_IDX[season];
+  const off=layer==='g'?6:2;
+  const pal=layer==='g'?G_PAL:T_PAL;
+  const vmin=layer==='g'?G_MIN:T_MIN;
+  const vmax=layer==='g'?G_MAX:T_MAX;
+  const pts=CP_RAW.map(p=>[p[0],p[1],p[off+si]]);
+  const cv=document.createElement('canvas');
+  cv.width=RES;cv.height=RES;
+  const ctx=cv.getContext('2d');
+  const img=ctx.createImageData(RES,RES);
+  for(let py=0;py<RES;py++){
+    for(let px=0;px<RES;px++){
+      const lon=BBOX.w+(px/(RES-1))*(BBOX.e-BBOX.w);
+      const lat=BBOX.n-(py/(RES-1))*(BBOX.n-BBOX.s);
+      const v=idw(lat,lon,pts,layer==='g'?2.6:2.2);
+      const[r,g,b]=palRGB(v,pal,vmin,vmax);
+      const i=(py*RES+px)*4;
+      img.data[i]=r;img.data[i+1]=g;img.data[i+2]=b;img.data[i+3]=192;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  const url=cv.toDataURL('image/png');
+  cvCache[key]=url;
+  return url;
+}
+
+// ════════════════════════════════════════════════════
+// MAP SETUP
+// ════════════════════════════════════════════════════
+const map=L.map('map',{center:[25.2000,51.5500],zoom:11,
+  zoomControl:false,attributionControl:true});
+L.control.zoom({position:'bottomright'}).addTo(map);
+
+const BM={
+  dark:L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+       {attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:20}),
+  satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+       {attribution:'© Esri',maxZoom:20}),
+  light:L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+       {attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:20}),
+};
+BM.dark.addTo(map);
+const SW=L.latLng(BBOX.s,BBOX.w),NE=L.latLng(BBOX.n,BBOX.e);
+const BOUNDS=L.latLngBounds(SW,NE);
+
+// ════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════
+let curSeason='summer', curLayer='t', activeKey=null;
+const ovCache={};
+
+function overlayKey(s,l){return s+'_'+l}
+
+function getOverlay(s,l){
+  const k=overlayKey(s,l);
+  if(ovCache[k])return ovCache[k];
+  let ov;
+  if(USE_GEE&&TILE_URLS[s]&&TILE_URLS[s][l]){
+    ov=L.tileLayer(TILE_URLS[s][l],{opacity:0,maxZoom:20,zIndex:5});
+  }else{
+    ov=L.imageOverlay(makeCanvas(s,l),BOUNDS,{opacity:0,interactive:false,zIndex:5});
+  }
+  ov.addTo(map);
+  ovCache[k]=ov;
+  return ov;
+}
+
+function showOverlay(s,l){
+  const k=overlayKey(s,l);
+  if(k===activeKey)return;
+  if(activeKey&&ovCache[activeKey])fadeOut(ovCache[activeKey]);
+  const ov=getOverlay(s,l);
+  fadeIn(ov,0.88);
+  activeKey=k;
+}
+
+function fadeIn(ov,target){
+  let op=0;
+  const id=setInterval(()=>{op=Math.min(target,op+0.07);ov.setOpacity(op);
+    if(op>=target)clearInterval(id);},14);
+}
+function fadeOut(ov){
+  let op=ov.options.opacity||0;
+  const id=setInterval(()=>{op=Math.max(0,op-0.07);ov.setOpacity(op);
+    if(op<=0)clearInterval(id);},14);
+}
+
+// ════════════════════════════════════════════════════
+// DISTRICT VALUE LOOKUP
+// ════════════════════════════════════════════════════
+function distVal(props,s,l){
+  if(ZONAL[s]){
+    const r=(ZONAL[s]||[]).find(x=>x.name===props.name_en||x.name===props.name);
+    if(r){
+      const v=l==='g'?r.ndvi_mean:r.lst_mean;
+      if(v!==undefined&&v!==null)return v;
+    }
+  }
+  // IDW fallback at polygon centroid
+  const feat=DISTRICTS.features.find(f=>
+    f.properties.name===props.name||f.properties.name_en===props.name_en);
+  if(!feat)return null;
+  const cs=feat.geometry.coordinates[0];
+  let la=0,lo=0;
+  for(const[ln,lt] of cs){la+=lt;lo+=ln;}
+  la/=cs.length;lo/=cs.length;
+  const si=S_IDX[s];
+  const off=l==='g'?6:2;
+  const pts=CP_RAW.map(p=>[p[0],p[1],p[off+si]]);
+  return idw(la,lo,pts,l==='g'?2.6:2.2);
+}
+
+// ════════════════════════════════════════════════════
+// DISTRICT LAYER
+// ════════════════════════════════════════════════════
+let distLayer=null;
+function buildDistricts(){
+  if(distLayer){map.removeLayer(distLayer);distLayer=null;}
+  if(!DISTRICTS.features.length)return;
+  distLayer=L.geoJSON(DISTRICTS,{
+    style:f=>styleD(f),
+    onEachFeature:(f,l)=>{
+      l.on({
+        mouseover:e=>onOver(e,f,l),
+        mousemove:e=>moveTip(e.originalEvent),
+        mouseout:()=>onOut(l),
+        click:()=>onClickD(f),
+      });
+    }
+  }).addTo(map);
+}
+function styleD(f){
+  const v=distVal(f.properties,curSeason,curLayer);
+  const col=v!=null?curHex(v):'rgba(255,255,255,0.15)';
+  return{color:col,weight:1.6,fillColor:col,fillOpacity:0.22};
+}
+function refreshStyles(){if(distLayer)distLayer.setStyle(f=>styleD(f));}
+
+// ════════════════════════════════════════════════════
+// HOVER TOOLTIP
+// ════════════════════════════════════════════════════
+const htip=document.getElementById('htip');
+function onOver(e,f,l){
+  l.setStyle({fillOpacity:0.50,weight:2.4});l.bringToFront();
+  const p=f.properties;
+  const v=distVal(p,curSeason,curLayer);
+  document.getElementById('ht-name').textContent=p.name_en||p.name;
+  document.getElementById('ht-ar').textContent=p.name_ar||'';
+  if(v!=null){
+    const col=curHex(v);
+    if(curLayer==='t'){
+      document.getElementById('ht-val').textContent=v.toFixed(1)+'°C';
+      document.getElementById('ht-label').textContent='Surface temperature · '+SEASONS[curSeason].label;
+    }else{
+      // Convert NDVI to qualitative greenery descriptor
+      const desc=v<0.05?'Bare / impervious':v<0.10?'Minimal vegetation':
+                  v<0.16?'Low greenery':v<0.22?'Moderate greenery':'High greenery';
+      document.getElementById('ht-val').textContent=desc;
+      document.getElementById('ht-label').textContent='Greenery index ('+v.toFixed(2)+') · '+SEASONS[curSeason].label;
+    }
+    document.getElementById('ht-val').style.color=col;
+  }else{
+    document.getElementById('ht-val').textContent='—';
+    document.getElementById('ht-val').style.color='var(--muted)';
+    document.getElementById('ht-label').textContent='';
+  }
+  document.getElementById('ht-desc').textContent=p.description||'';
+  htip.style.display='block';
+  moveTip(e.originalEvent);
+}
+function moveTip(ev){
+  const w=htip.offsetWidth||240;
+  const x=ev.clientX+w+24>window.innerWidth?ev.clientX-w-12:ev.clientX+16;
+  htip.style.left=Math.max(8,x)+'px';
+  htip.style.top=(ev.clientY-10)+'px';
+}
+function onOut(l){distLayer.resetStyle(l);htip.style.display='none';}
+
+// ════════════════════════════════════════════════════
+// CLICK POPUP — seasonal profile (no year axis)
+// ════════════════════════════════════════════════════
+function onClickD(f){
+  const p=f.properties;
+  const vmin=curLayer==='g'?G_MIN:T_MIN;
+  const vmax=curLayer==='g'?G_MAX:T_MAX;
+
+  const bars=SKEYS.map(sk=>{
+    const v=distVal(p,sk,curLayer);
+    if(v==null)return'';
+    const pct=Math.round(Math.max(0,Math.min(100,(v-vmin)/(vmax-vmin)*100)));
+    const col=curHex(v); // uses curLayer
+    // Temporarily swap season for colour
+    const tmpL=curLayer;
+    const lbl=tmpL==='g'
+      ?(v<0.05?'Bare':v<0.10?'Minimal':v<0.16?'Low':v<0.22?'Moderate':'High')
+      :v.toFixed(1)+'°C';
+    return `<div class="pop-bar">
+      <div class="pop-bar-label">${SEASONS[sk].label}</div>
+      <div class="pop-bar-track"><div class="pop-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      <div class="pop-bar-num" style="color:${col}">${lbl}</div>
+    </div>`;
+  }).join('');
+
+  const layerLabel=curLayer==='g'?'Greenery':'Surface heat';
+  const cs=f.geometry.coordinates[0];
+  let la=0,lo=0;
+  for(const[ln,lt] of cs){la+=lt;lo+=ln;}
+
+  L.popup({maxWidth:248,minWidth:230})
+    .setLatLng([la/cs.length,lo/cs.length])
+    .setContent(`<div class="pop">
+      <div class="pop-name">${p.name_en||p.name}</div>
+      <div class="pop-ar">${p.name_ar||''}</div>
+      <div class="pop-section">${layerLabel} by season</div>
+      ${bars}
+      <div class="pop-desc">${p.description||''}</div>
+      <div class="pop-src">Median Landsat 8/9 land-surface composite · simulated demo · 30 m resolution ·
+        ${USE_GEE?'Google Earth Engine':'Simulated — run with GEE for real data'}</div>
+    </div>`)
+    .openOn(map);
+}
+
+// ════════════════════════════════════════════════════
+// STATE SETTERS
+// ════════════════════════════════════════════════════
+function setSeason(s){
+  curSeason=s;
+  document.querySelectorAll('.s-pill').forEach(b=>b.classList.toggle('active',b.dataset.s===s));
+  updatePanel();
+  showOverlay(s,curLayer);
+  refreshStyles();
+  map.closePopup();
+}
+
+function setLayer(l){
+  curLayer=l;
+  document.getElementById('cb-t').style.display =l==='t'?'block':'none';
+  document.getElementById('cb-g').style.display =l==='g'?'block':'none';
+  document.getElementById('tick-t').style.display=l==='t'?'flex':'none';
+  document.getElementById('tick-g').style.display=l==='g'?'flex':'none';
+  document.getElementById('leg-title').textContent=l==='g'?'Greenery':'Temp (°C)';
+  document.getElementById('btn-t').className='lyr-btn'+(l==='t'?' active-t':'');
+  document.getElementById('btn-g').className='lyr-btn'+(l==='g'?' active-g':'');
+  showOverlay(curSeason,l);
+  refreshStyles();
+  map.closePopup();
+}
+
+function setBasemap(bm){
+  Object.entries(BM).forEach(([k,v])=>{
+    if(k===bm){if(!map.hasLayer(v))v.addTo(map);v.bringToBack();}
+    else if(map.hasLayer(v))map.removeLayer(v);
+  });
+  document.querySelectorAll('.bm-btn').forEach(b=>
+    b.classList.toggle('active',b.id==='bm-'+bm));
+}
+
+function updatePanel(){
+  const s=SEASONS[curSeason];
+  document.getElementById('ip-season').textContent=s.label;
+  document.getElementById('ip-months').textContent=s.months;
+  const values=(DISTRICTS.features||[]).map(f=>({
+    name:f.properties.name_en||f.properties.name,
+    value:distVal(f.properties,curSeason,'t')
+  })).filter(x=>x.value!==undefined&&x.value!==null&&!isNaN(x.value));
+  const st=SEASON_STATS[curSeason];
+  if(values.length){
+    const hot=values.reduce((a,b)=>a.value>b.value?a:b);
+    const cool=values.reduce((a,b)=>a.value<b.value?a:b);
+    const avg=values.reduce((sum,x)=>sum+x.value,0)/values.length;
+    document.getElementById('ip-hot').textContent=hot.name;
+    document.getElementById('ip-cool').textContent=cool.name;
+    document.getElementById('ip-avg').textContent=avg.toFixed(1)+'°C';
+    document.getElementById('ip-note').textContent=USE_GEE
+      ?'District values are polygon means from the active seasonal composite; hover for local land-use interpretation.'
+      :'Demo values use a client-side surface simulation; run with GEE for measured district means.';
+  }else{
+    document.getElementById('ip-hot').textContent=st.hot;
+    document.getElementById('ip-cool').textContent=st.cool;
+    document.getElementById('ip-avg').textContent=st.avg;
+    document.getElementById('ip-note').textContent=st.note;
+  }
+}
+
+// ════════════════════════════════════════════════════
+// LEGEND TICKS
+// ════════════════════════════════════════════════════
+function buildLegend(){
+  [['tick-t',T_MAX,(T_MAX+T_MIN)/2,T_MIN,'°C'],
+   ['tick-g',G_MAX,((G_MAX+G_MIN)/2).toFixed(2),G_MIN,'']].forEach(([id,hi,mid,lo,unit])=>{
+    const el=document.getElementById(id);
+    [hi,mid,lo].forEach(v=>{
+      const s=document.createElement('span');
+      s.textContent=(typeof v==='number'&&!isNaN(v)?v:v)+unit;
+      el.appendChild(s);
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  // Build season pills
+  const sp=document.getElementById('season-pills');
+  Object.keys(SEASONS).forEach(k=>{
+    const b=document.createElement('div');
+    b.className='s-pill';b.dataset.s=k;
+    b.textContent=SEASONS[k].label;
+    b.onclick=()=>setSeason(k);
+    sp.appendChild(b);
+  });
+
+  buildLegend();
+  buildDistricts();
+  setSeason('summer');
+  map.fitBounds(BOUNDS,{padding:[50,50]});
+
+  setTimeout(()=>{
+    const ld=document.getElementById('loader');
+    ld.style.transition='opacity .45s';ld.style.opacity='0';
+    setTimeout(()=>ld.remove(),450);
+  },550);
+});
+</script>
+</body>
+</html>
