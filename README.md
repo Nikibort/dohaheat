@@ -2,6 +2,7 @@
 
 Interactive map of land surface temperature and vegetation (greenery) across Doha
 districts, derived from Landsat 8/9 satellite imagery via Google Earth Engine.
+It maps Doha's surface heat per neighbourhood using Landsat data.
 
 **Live demo** → https://&lt;your-github-username&gt;.github.io/&lt;repo-name&gt;/
 
