@@ -8,6 +8,7 @@ It maps Doha's surface heat per neighbourhood using Landsat data.
 
 ---
 
+
 ## What it shows
 
 | Layer | Source | Description |
