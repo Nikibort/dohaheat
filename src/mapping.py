@@ -523,18 +523,48 @@ function buildDistricts(){{
   }}).addTo(map);
 }}
 function styleD(f){{
-  const v=distVal(f.properties,curSeason,curLayer);
-  const col=v!=null?curHex(v):'rgba(255,255,255,0.15)';
-  return{{color:col,weight:2.0,fillColor:col,fillOpacity:0.02}};
+  const col='rgba(255,255,255,0.82)';
+  return{{color:col,weight:1.8,fillColor:'#ffffff',fillOpacity:0.0}};
 }}
 function refreshStyles(){{if(distLayer)distLayer.setStyle(f=>styleD(f));}}
+
+function activeValues(s,l){{
+  return (DISTRICTS.features||[]).map(f=>distVal(f.properties,s,l))
+    .filter(v=>v!==undefined&&v!==null&&!isNaN(v));
+}}
+function activeAvg(s,l){{
+  const vals=activeValues(s,l);
+  if(!vals.length)return null;
+  return vals.reduce((a,b)=>a+b,0)/vals.length;
+}}
+function greeneryClass(v){{
+  return v<0.05?'very sparse vegetation':v<0.10?'minimal vegetation':
+         v<0.16?'low greenery':v<0.22?'moderate greenery':'high greenery';
+}}
+function climateNote(p,s,l,v){{
+  const base=p.description||'';
+  if(v===undefined||v===null||isNaN(v))return base;
+  const avg=activeAvg(s,l);
+  if(l==='g'){{
+    const rel=avg==null?'':v>=avg?'above':'below';
+    return `This polygon has ${{greeneryClass(v)}}${{avg==null?'':' and is '+rel+' the current district average'}}. ${{base}}`;
+  }}
+  const ndvi=distVal(p,s,'g');
+  const rel=avg==null?'':v>=avg+1?'above':v<=avg-1?'below':'near';
+  const relTxt=avg==null?'':rel==='near'
+    ?'near the current district average'
+    :`${{Math.abs(v-avg).toFixed(1)}}°C ${{rel}} the current district average`;
+  const vegTxt=ndvi==null||isNaN(ndvi)?''
+    :` The same composite shows ${{greeneryClass(ndvi)}} (NDVI ${{ndvi.toFixed(2)}}), which helps explain the surface heat pattern.`;
+  return `This polygon mean is ${{relTxt}}.${{vegTxt}} ${{base}}`;
+}}
 
 // ════════════════════════════════════════════════════
 // HOVER TOOLTIP
 // ════════════════════════════════════════════════════
 const htip=document.getElementById('htip');
 function onOver(e,f,l){{
-  l.setStyle({{fillOpacity:0.08,weight:2.8}});l.bringToFront();
+  l.setStyle({{color:curLayer==='g'?'#8bdc8f':'#ffd08a',fillOpacity:0.04,weight:2.8}});l.bringToFront();
   const p=f.properties;
   const v=distVal(p,curSeason,curLayer);
   document.getElementById('ht-name').textContent=p.name_en||p.name;
@@ -557,7 +587,7 @@ function onOver(e,f,l){{
     document.getElementById('ht-val').style.color='var(--muted)';
     document.getElementById('ht-label').textContent='';
   }}
-  document.getElementById('ht-desc').textContent=p.description||'';
+  document.getElementById('ht-desc').textContent=climateNote(p,curSeason,curLayer,v);
   htip.style.display='block';
   moveTip(e.originalEvent);
 }}
