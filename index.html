@@ -401,8 +401,7 @@ function buildDistricts(){
   }).addTo(map);
 }
 function styleD(f){
-  const col='rgba(255,255,255,0.82)';
-  return{color:col,weight:1.8,fillColor:'#ffffff',fillOpacity:0.0};
+  return{color:'#000000',weight:2.1,fillColor:'#000000',fillOpacity:0.0};
 }
 function refreshStyles(){if(distLayer)distLayer.setStyle(f=>styleD(f));}
 
@@ -442,7 +441,7 @@ function climateNote(p,s,l,v){
 // ════════════════════════════════════════════════════
 const htip=document.getElementById('htip');
 function onOver(e,f,l){
-  l.setStyle({color:curLayer==='g'?'#8bdc8f':'#ffd08a',fillOpacity:0.04,weight:2.8});l.bringToFront();
+  l.setStyle({color:'#000000',fillOpacity:0.04,weight:3.0});l.bringToFront();
   const p=f.properties;
   const v=distVal(p,curSeason,curLayer);
   document.getElementById('ht-name').textContent=p.name_en||p.name;
