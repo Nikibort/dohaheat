@@ -139,6 +139,7 @@ def main():
         PROJECT_ROOT / "outputs" / "maps" / "doha_seasonal_temperature_map.html"
     )
     docs_path = PROJECT_ROOT / "docs" / "index.html"
+    root_pages_path = PROJECT_ROOT / "index.html"
     geojson_path = PROJECT_ROOT / "data" / "doha_districts.geojson"
 
     def _save(html):
@@ -147,6 +148,8 @@ def main():
         if args.publish:
             mapping.save_map_html(html, docs_path)
             print(f"Published → {docs_path}  (commit docs/ to deploy via GitHub Pages)")
+            mapping.save_map_html(html, root_pages_path)
+            print(f"Published root index → {root_pages_path}  (for Pages source: main / root)")
 
     # ── Demo mode ───────────────────────────────────────────────────────────
     if args.demo:
